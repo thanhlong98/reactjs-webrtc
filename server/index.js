@@ -13,49 +13,51 @@ const io = socket(server)
 //     'socketID4',
 //   ]
 // }
-const users = {}
-
-const socketToRoom = {}
+const rooms = {}
 
 io.on('connection', (socket) => {
-  socket.on('join room', (roomID) => {
-    if (users[roomID]) {
-      const length = users[roomID].length
+  // socket.on('join', (roomId) => {
+  //   const roomClients = io.sockets.adapter.rooms[roomId] || { length: 0 }
+  //   const numberOfClients = roomClients.length
 
-      if (length === 4) {
-        socket.emit('room full')
-      }
+  //   if (rooms[roomId]) {
+  //     rooms[roomId].push(socket.id)
+  //   } else {
+  //     rooms[roomId] = [socket.id]
+  //   }
 
-      users[roomID].push(socket.id)
+  //   const otherUser = rooms[roomId].filter((id) => id !== socket.id)
+
+  //   if (otherUser) {
+  //     socket.emit('other_user', otherUser)
+  //     socket.broadcast.emit('user_joined', socket.id)
+  //   }
+  // })
+
+  // socket.on('offer', (payload) => {
+  //   io.to(payload.target).emit('offer', payload)
+  // })
+
+  socket.on('join', (roomId) => {
+    const roomClients = io.sockets.adapter.rooms[roomId] || { length: 0 }
+    const numberOfClients = roomClients.length
+
+    // These events are emitted only to the sender socket.
+    if (numberOfClients == 0) {
+      console.log(
+        `Creating room ${roomId} and emitting room_created socket event`
+      )
+      socket.join(roomId)
+      socket.emit('room_created', roomId)
+    } else if (numberOfClients <= 10) {
+      console.log(
+        `Joining room ${roomId} and emitting room_joined socket event`
+      )
+      socket.join(roomId)
+      socket.emit('room_joined', roomId)
     } else {
-      users[roomID] = [socket.id]
-    }
-
-    socketToRoom[socket.id] = roomID
-    const usersInThisRoom = users[roomID].filter((id) => id !== socket.id)
-    socket.emit('all users', usersInThisRoom)
-  })
-
-  socket.on('sending signal', (payload) => {
-    io.to(payload.userToSignal).emit('user joined', {
-      signal: payload.signal,
-      callerID: payload.callerID,
-    })
-  })
-
-  socket.on('returning signal', (payload) => {
-    io.to(payload.callerID).emit('receiving returned signal', {
-      signal: payload.signal,
-      id: socket.id,
-    })
-  })
-
-  socket.on('disconnect', () => {
-    const roomID = socketToRoom[socket.id]
-    let room = users[roomID]
-    if (room) {
-      room = room.filter((id) => id !== socket.id)
-      users[roomID] = room
+      console.log(`Can't join room ${roomId}, emitting full_room socket event`)
+      socket.emit('full_room', roomId)
     }
   })
 })

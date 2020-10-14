@@ -1,6 +1,5 @@
 import React from 'react'
 import { BrowserRouter, Route, Switch } from 'react-router-dom'
-import './App.css'
 import CreateRoom from './pages/createRoom'
 import Room from './pages/room'
 import Room2 from './pages/room2'
