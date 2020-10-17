@@ -14,52 +14,66 @@ const io = socket(server)
 //   ]
 // }
 const rooms = {}
+const users = {}
+
+const connectedPeers = new Map()
 
 io.on('connection', (socket) => {
-  // socket.on('join', (roomId) => {
-  //   const roomClients = io.sockets.adapter.rooms[roomId] || { length: 0 }
-  //   const numberOfClients = roomClients.length
-
-  //   if (rooms[roomId]) {
-  //     rooms[roomId].push(socket.id)
-  //   } else {
-  //     rooms[roomId] = [socket.id]
-  //   }
-
-  //   const otherUser = rooms[roomId].filter((id) => id !== socket.id)
-
-  //   if (otherUser) {
-  //     socket.emit('other_user', otherUser)
-  //     socket.broadcast.emit('user_joined', socket.id)
-  //   }
-  // })
-
-  // socket.on('offer', (payload) => {
-  //   io.to(payload.target).emit('offer', payload)
-  // })
-
   socket.on('join', (roomId) => {
     const roomClients = io.sockets.adapter.rooms[roomId] || { length: 0 }
     const numberOfClients = roomClients.length
 
+    rooms[roomId] = rooms[roomId] ? [...rooms[roomId], socket.id] : [socket.id]
+    users[socket.id] = roomId
     // These events are emitted only to the sender socket.
+
     if (numberOfClients == 0) {
-      console.log(
-        `Creating room ${roomId} and emitting room_created socket event`
-      )
       socket.join(roomId)
-      socket.emit('room_created', roomId)
     } else if (numberOfClients <= 10) {
-      console.log(
-        `Joining room ${roomId} and emitting room_joined socket event`
-      )
       socket.join(roomId)
-      socket.emit('room_joined', roomId)
+
+      const otherUsers = rooms[roomId].filter((id) => id !== socket.id)
+
+      // Gửi tất cả user trong room ngoại trừ sender
+      socket.broadcast.to(roomId).emit('new_user', socket.id)
+
+      // Chỉ gửi cho sender
+      socket.emit('list_user', otherUsers)
     } else {
-      console.log(`Can't join room ${roomId}, emitting full_room socket event`)
       socket.emit('full_room', roomId)
     }
   })
+
+  socket.on('disconnect', () => {
+    const roomId = users[socket.id]
+    if (rooms[roomId]) {
+      rooms[roomId] = rooms[roomId].filter((id) => id !== socket.id)
+      delete users[socket.id]
+      socket.broadcast.to(roomId).emit('peer_disconnected', socket.id)
+    }
+  })
+
+  socket.on('sending_signal', (payload) => {
+    io.to(payload.userToSignal).emit('user_joind')
+  })
+
+  // socket.on('start_call', (roomId) => {
+  //   socket.broadcast.to(roomId).emit('call')
+  // })
+
+  // socket.on('offer', (payload) => {
+  //   socket.broadcast.to(payload.roomId).emit('offer', payload)
+  // })
+
+  // socket.on('answer', (payload) => {
+  //   socket.broadcast.to(payload.roomId).emit('answer', payload)
+  // })
+
+  // socket.on('ice-candidate', (incoming) => {
+  //   socket.broadcast
+  //     .to(incoming.roomId)
+  //     .emit('ice-candidate', incoming.candidate)
+  // })
 })
 
 server.listen(process.env.PORT || 8000, () =>
